@@ -46,17 +46,17 @@ def calculate_distance_revised(row):
     return distance
 
 # Initialize an empty DataFrame to hold the Master OD Table
-master_od_table_isolate = pd.DataFrame()
+master_od_table = pd.DataFrame()
 
 # Create a chunk iterator to read chunks from the Passenger OD data
 chunk_size = 10000  # Define the chunk size
-chunk_iter_isolate = pd.read_csv(passenger_od_data_path, chunksize=chunk_size)
+chunk_iter = pd.read_csv(passenger_od_data_path, chunksize=chunk_size)
 
 # Initialize a list to hold information about any exceptions that occur
-exceptions_isolate = []
+exceptions = []
 
 # Process each chunk and append it to the Master OD Table
-for i, chunk in enumerate(chunk_iter_isolate):
+for i, chunk in enumerate(chunk_iter):
     try:
         chunk_filtered = chunk[chunk['origin_zone_id'].str[:5].str.isnumeric() & chunk['destination_zone_id'].str[:5].str.isnumeric()]
         chunk_filtered['origin_zone_id_short'] = chunk_filtered['origin_zone_id'].str[:5].astype(int)
@@ -74,9 +74,18 @@ for i, chunk in enumerate(chunk_iter_isolate):
         
         merged_chunk_2['distance_of_trip'] = merged_chunk_2.apply(calculate_distance_revised, axis=1)
         
-        # At this point, add more steps to calculate passenger values and finalize the chunk
+        merged_chunk_2['total_passengers'] = merged_chunk_2['annual_total_trips']
+        merged_chunk_2['passengers_by_air'] = merged_chunk_2['mode_air']
+        merged_chunk_2['passengers_by_vehicle'] = merged_chunk_2['mode_vehicle']
         
-        master_od_table_isolate = pd.concat([master_od_table_isolate, merged_chunk_2], ignore_index=True)
+        columns_needed = [
+            'origin_zone_id', 'origin_zone_name', 'population_2022_x', 
+            'destination_zone_id', 'destination_zone_name', 'population_2022_y',
+            'distance_of_trip', 'total_passengers', 'passengers_by_air', 'passengers_by_vehicle'
+        ]
+        finalized_chunk = merged_chunk_2[columns_needed]
+        
+        master_od_table = pd.concat([master_od_table, finalized_chunk], ignore_index=True)
         
     except Exception as e:
-        exceptions_isolate.append((i, str(e)))
+        exceptions.append((i, str(e)))
